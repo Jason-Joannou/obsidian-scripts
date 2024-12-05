@@ -2,8 +2,28 @@ module.exports = async function(tp) {
         try {
             const app = this.app || window.app;
     
-            // Prompt for project name and validate project
-            const projectName = await tp.system.prompt("Enter Project Name:");
+            // Get list of files/folders in Projects directory
+            const projectItems = app.vault.getAbstractFileByPath('Projects');
+            if (!projectItems || !projectItems.children) {
+                new Notice("No items found in Projects directory");
+                return;
+            }
+
+            // Create a list of project items for selection
+            const projectNames = projectItems.children.map(item => item.name);
+
+            // Prompt user to select item to archive
+            const projectName = await tp.system.suggester(
+                projectNames, 
+                projectNames, 
+                false, 
+                "Select the project where this task will be created:"
+            );
+
+            if (!projectName) {
+                new Notice("No item selected. Aborting operation.");
+                return;
+            }
             let basePath = `Projects/${projectName}`;
             const projectFolder = app.vault.getAbstractFileByPath(basePath);
             if (!projectFolder) {
@@ -15,27 +35,29 @@ module.exports = async function(tp) {
             // Prompt for task description and milestone
             const taskName = await tp.system.prompt("Enter Task Name:");
             const taskDescription = await tp.system.prompt("Enter Task Description:");
-            const milestoneName = await tp.system.prompt("Enter Milestone Name:");
-            const milestonePath = `${basePath}Milestones/${milestoneName}.md`;
+
+            const milestoneItems = app.vault.getAbstractFileByPath(`${basePath}Milestones`);
+            if (!milestoneItems || !milestoneItems.children) {
+                new Notice("No Milestones found in Projects directory");
+                return;
+            }
+
+            // Create a list of project items for selection
+            const milestoneNames = milestoneItems.children.map(item => item.name);
+
+            // Prompt user to select item to archive
+            const milestoneName = await tp.system.suggester(
+                milestoneNames, 
+                milestoneNames, 
+                false, 
+                "Select the milestone to assign this task to:"
+            );
+
+
+            const milestonePath = `${basePath}Milestones/${milestoneName}`;
     
             // Check if the milestone exists, or create a new one
             let milestoneFile = app.vault.getAbstractFileByPath(milestonePath);
-            if (!milestoneFile) {
-                const milestoneTemplate = `---
-due-date: 
-status: not-started
-project: ${projectName}
-tasks: []
----
-
-### Tasks Assigned to this Milestone:
-No tasks assigned yet.
-- [ ] Description of the milestone.`;
-    
-                // Create the milestone if it doesn't exist
-                milestoneFile = await app.vault.create(milestonePath, milestoneTemplate);
-                new Notice(`Milestone '${milestoneName}' created.`);
-            }
     
             // Read milestone content and update the task list
             const milestoneContent = await app.vault.read(milestoneFile);
@@ -54,10 +76,13 @@ status: todo
 priority: 
 milestone: ${milestoneName}
 project: ${projectName}
---- 
+---
 
-# Task: ${taskName}
-- [ ] ${taskDescription}`;
+# ${taskName}
+
+**Description**
+
+${taskDescription}`;
     
             await app.vault.create(taskPath, taskContent);
     
@@ -108,7 +133,7 @@ project: ${projectName}
                     const kanbanContent = await app.vault.read(kanbanFile);
                     const updatedKanban = kanbanContent.replace(
                         /## To Do[\s\S]*?(- \[ \] .*)?/,
-                        `## To Do\n- [ ] ${taskName}\n$1`
+                        `## To Do\n- [[${basePath}Tasks/${taskName}|${taskName}]]\n$1`
                     );
                     await app.vault.modify(kanbanFile, updatedKanban);
                 }

@@ -20,7 +20,7 @@ module.exports = async function(tp) {
 
 ## Milestones
 \`\`\`dataview
-table due-date as "Due Date", status, file.tasks.length as "Number of Tasks"
+table due-date as "Due Date", status, length(tasks) as "Number of Tasks"
 from "${basePath}Milestones"
 sort due-date asc
 \`\`\`
